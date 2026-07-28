@@ -1,0 +1,23 @@
+Factor,Cluster
+NII (₹ Cr),1
+Net Profit (₹ Cr),1
+CPI_Index,1
+WPI_Index,1
+Trade_Balance_Billion_USD,2
+Real_GDP_YoY_Growth_%,3
+Repo_Rate_%,4
+CRR_%,5
+FII_Net,6
+DII_Net,7
+US_10Y,8
+US_5Y,8
+Gold_Close,9
+Bond_10Y,10
+Bond_5Y,10
+Nifty_RSI_14,11
+ICICI_RSI_14,11
+BankNifty_RSI_14,11
+BankNifty_Close,12
+Nifty_Close,12
+ICICI_Close,12
+USD_INR,13
