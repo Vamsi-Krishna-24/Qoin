@@ -6,7 +6,7 @@
     "date_end": "2026-05-11",
     "ridge_alpha": 0.41246263829013524,
     "embedding_stress_mse": 0.03921266781661367,
-    "note": "Directions are unit vectors in 3D optimised to preserve real pairwise correlations (angles)."
+    "note": "Directions preserve real pairwise correlations. Price direction is the weighted sum of factor directions."
   },
   "axes": [
     {
@@ -241,6 +241,16 @@
       "abs_weight": 0.0002818321063713035
     }
   ],
+  "price_direction": {
+    "name": "ICICI_Close (projection direction)",
+    "direction": [
+      0.9706098495687351,
+      -0.11353769459813735,
+      -0.21219262905078862
+    ],
+    "magnitude_before_normalise": 0.9940582805504847,
+    "description": "Direction of the linear combination sum(w_i * factor_i) inside the 3D embedding"
+  },
   "correlation_matrix": [
     [
       0.999999,

@@ -1,6 +1,6 @@
 """
 Build a geometrically faithful 3D representation of the 21-factor vector space.
-Exports a single JSON that any HTML front-end can consume.
+Now also exports the price projection direction.
 """
 
 import json
@@ -28,44 +28,37 @@ print(f"Loaded {len(df)} rows | {n_factors} factors")
 print("Date range:", df["Date"].min().date(), "→", df["Date"].max().date())
 
 # ============================================================
-# 2. Normalize (this creates the proper vector space)
+# 2. Normalize
 # ============================================================
 scaler_X = StandardScaler()
 scaler_y = StandardScaler()
 
-X = scaler_X.fit_transform(df[feature_cols].values)          # (T, 21)
-y = scaler_y.fit_transform(df[[target_col]].values).ravel()  # (T,)
+X = scaler_X.fit_transform(df[feature_cols].values)
+y = scaler_y.fit_transform(df[[target_col]].values).ravel()
 
 # ============================================================
-# 3. Correlation matrix → target angles
+# 3. Correlation → target angles
 # ============================================================
-corr = np.corrcoef(X, rowvar=False)          # (21, 21)
-# numerical safety
+corr = np.corrcoef(X, rowvar=False)
 corr = np.clip(corr, -0.999999, 0.999999)
-target_cos = corr.copy()                     # we will match dot products of unit vectors
+target_cos = corr.copy()
 
-print("\nCorrelation matrix computed.")
+print("Correlation matrix computed.")
 
 # ============================================================
-# 4. Embed 21 directions into 3D while preserving angles
-#    We optimise unit vectors so that their dot products
-#    stay as close as possible to the real correlations.
+# 4. Embed 21 directions into 3D
 # ============================================================
 def spherical_embedding_loss(flat_vecs, target_cos):
-    """flat_vecs: (n*3,) → reshape to (n,3), normalise, compute stress"""
     n = target_cos.shape[0]
     vecs = flat_vecs.reshape(n, 3)
-    # re-normalise to be safe
     vecs = vecs / (np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-12)
     dots = vecs @ vecs.T
-    # only upper triangle (excluding diagonal)
     mask = np.triu(np.ones_like(target_cos), k=1).astype(bool)
     return np.mean((dots[mask] - target_cos[mask]) ** 2)
 
 def embed_directions(target_cos, seed=42):
     n = target_cos.shape[0]
     rng = np.random.RandomState(seed)
-    # good initialisation: random on sphere
     init = rng.normal(size=(n, 3))
     init /= np.linalg.norm(init, axis=1, keepdims=True)
 
@@ -97,27 +90,28 @@ alpha_chosen = float(model.alpha_)
 print(f"Ridge alpha: {alpha_chosen:.4f}")
 
 # ============================================================
-# 6. Daily coordinates, projection, residual (optional but useful)
+# 6. Price projection direction in the same 3D embedding
+#    d_price = sum( w_i * d_i )
 # ============================================================
-# Projected price in z-space
-y_proj = X @ weights
-residual = y - y_proj
+price_dir_3d = directions_3d.T @ weights
+price_dir_norm = np.linalg.norm(price_dir_3d)
+price_dir_unit = price_dir_3d / (price_dir_norm + 1e-12)
+
+print(f"Price direction magnitude (pre-normalise): {price_dir_norm:.4f}")
 
 # ============================================================
 # 7. Export single JSON
 # ============================================================
-# Make directions and weights easy to use in JS
 axes = []
 for i, name in enumerate(feature_cols):
     axes.append({
         "id": i,
         "name": name,
-        "direction": directions_3d[i].tolist(),   # unit vector [x,y,z]
+        "direction": directions_3d[i].tolist(),
         "weight": float(weights[i]),
         "abs_weight": float(abs(weights[i]))
     })
 
-# sort by absolute weight for convenience
 axes_sorted = sorted(axes, key=lambda a: a["abs_weight"], reverse=True)
 
 output = {
@@ -128,11 +122,17 @@ output = {
         "date_end": str(df["Date"].max().date()),
         "ridge_alpha": alpha_chosen,
         "embedding_stress_mse": float(spherical_embedding_loss(directions_3d.ravel(), target_cos)),
-        "note": "Directions are unit vectors in 3D optimised to preserve real pairwise correlations (angles)."
+        "note": "Directions preserve real pairwise correlations. Price direction is the weighted sum of factor directions."
     },
     "axes": axes_sorted,
+    "price_direction": {
+        "name": "ICICI_Close (projection direction)",
+        "direction": price_dir_unit.tolist(),
+        "magnitude_before_normalise": float(price_dir_norm),
+        "description": "Direction of the linear combination sum(w_i * factor_i) inside the 3D embedding"
+    },
     "correlation_matrix": corr.tolist(),
-    "feature_order": feature_cols,           # original order matching X columns
+    "feature_order": feature_cols,
     "weights_original_order": weights.tolist()
 }
 
@@ -141,9 +141,5 @@ with open(out_path, "w") as f:
     json.dump(output, f, indent=2)
 
 print(f"\nExported → {out_path.resolve()}")
-print("JSON contains:")
-print("  • meta information")
-print("  • 21 axes with 3D directions + weights")
-print("  • full correlation matrix")
-print("  • original feature order & weights")
-print("\nDone. HTML can now be 100% data-driven from this file.")
+print("JSON now also contains the price projection direction.")
+print("Done.")

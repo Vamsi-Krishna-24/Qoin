@@ -46,7 +46,7 @@
       border: 1px solid #1e293b;
       border-radius: 10px;
       padding: 12px 14px;
-      max-width: 260px;
+      max-width: 270px;
       z-index: 10;
       font-size: 12px;
       line-height: 1.45;
@@ -65,7 +65,7 @@
       overflow-y: auto;
       font-size: 11px;
       z-index: 10;
-      min-width: 190px;
+      min-width: 200px;
     }
     .legend-title {
       font-weight: 600;
@@ -84,6 +84,13 @@
       width: 10px; height: 10px;
       border-radius: 2px;
       flex-shrink: 0;
+    }
+    .legend-price {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #334155;
+      color: #f472b6;
+      font-weight: 600;
     }
 
     .controls {
@@ -124,7 +131,6 @@
     }
     .file-box h2 { font-size: 16px; margin-bottom: 10px; color: #f8fafc; }
     .file-box p { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
-    .file-box input { color: #e2e8f0; }
   </style>
 </head>
 <body>
@@ -137,9 +143,7 @@
 
   <div class="info-panel" id="info-panel">
     <strong>Data-driven geometry</strong><br>
-    Axes directions come from real correlations.<br>
-    Length ∝ |weight|.<br>
-    Drag to rotate • Scroll to zoom
+    Loading…
   </div>
 
   <div class="legend" id="legend"></div>
@@ -148,9 +152,9 @@
     <button id="btn-reset">Reset View</button>
     <button id="btn-labels">Toggle Labels</button>
     <button id="btn-equal">Equal Length</button>
+    <button id="btn-price">Toggle Price Dir</button>
   </div>
 
-  <!-- Fallback if fetch fails (file:// protocol) -->
   <div class="file-fallback" id="file-fallback">
     <div class="file-box">
       <h2>Load vector_space.json</h2>
@@ -178,6 +182,8 @@
       0xfb7185, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
       0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0xf43f5e
     ];
+
+    const PRICE_COLOR = 0xf472b6;   // pink for price direction
 
     // -------------------- Three.js --------------------
     const container = document.getElementById('canvas-container');
@@ -212,27 +218,35 @@
     let labelSprites = [];
     let showLabels = true;
     let useWeightLength = true;
+    let showPriceDir = true;
     let currentData = null;
+    let priceObjects = [];
 
-    // -------------------- Drawing --------------------
+    // -------------------- Drawing helpers --------------------
     function clearAxes() {
       while (axesGroup.children.length) axesGroup.remove(axesGroup.children[0]);
       labelSprites = [];
+      priceObjects = [];
     }
 
-    function createAxis(direction, color, name, length) {
+    function createAxis(direction, color, name, length, isPrice = false) {
       const dir = new THREE.Vector3(...direction).normalize();
       const end = dir.clone().multiplyScalar(length);
 
-      // line
+      const lineMat = new THREE.LineBasicMaterial({
+        color,
+        linewidth: isPrice ? 3 : 1
+      });
       const geo = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0,0,0), end
       ]);
-      axesGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color })));
+      const line = new THREE.Line(geo, lineMat);
+      axesGroup.add(line);
 
-      // cone
+      const coneRadius = isPrice ? 0.12 : 0.07;
+      const coneHeight = isPrice ? 0.35 : 0.22;
       const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(0.07, 0.22, 8),
+        new THREE.ConeGeometry(coneRadius, coneHeight, 10),
         new THREE.MeshBasicMaterial({ color })
       );
       cone.position.copy(end);
@@ -241,24 +255,28 @@
 
       // label
       const canvas = document.createElement('canvas');
-      canvas.width = 340; canvas.height = 64;
+      canvas.width = 380; canvas.height = 64;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#0b0f19';
-      ctx.fillRect(0,0,340,64);
-      ctx.font = 'bold 25px Segoe UI, sans-serif';
+      ctx.fillRect(0,0,380,64);
+      ctx.font = isPrice ? 'bold 28px Segoe UI, sans-serif' : 'bold 24px Segoe UI, sans-serif';
       ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(name, 170, 32);
+      ctx.fillText(name, 190, 32);
 
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
         map: new THREE.CanvasTexture(canvas),
         transparent: true
       }));
-      sprite.scale.set(1.7, 0.32, 1);
-      sprite.position.copy(end.clone().multiplyScalar(1.18));
+      sprite.scale.set(isPrice ? 2.1 : 1.7, 0.36, 1);
+      sprite.position.copy(end.clone().multiplyScalar(1.20));
       axesGroup.add(sprite);
       labelSprites.push(sprite);
+
+      if (isPrice) {
+        priceObjects.push(line, cone, sprite);
+      }
     }
 
     function renderSpace(data) {
@@ -270,15 +288,15 @@
 
       // legend
       const legend = document.getElementById('legend');
-      legend.innerHTML = `<div class="legend-title">Axes (${axes.length}) – sorted by |w|</div>`;
+      legend.innerHTML = `<div class="legend-title">Factor Axes (${axes.length})</div>`;
 
       axes.forEach((ax, i) => {
         const len = useWeightLength
-          ? 1.8 + 4.2 * (ax.abs_weight / maxAbs)   // min 1.8, max ~6
-          : 5.0;
+          ? 1.6 + 4.0 * (ax.abs_weight / maxAbs)
+          : 4.8;
 
         const color = COLORS[i % COLORS.length];
-        createAxis(ax.direction, color, ax.name, len);
+        createAxis(ax.direction, color, ax.name, len, false);
 
         const item = document.createElement('div');
         item.className = 'legend-item';
@@ -288,15 +306,27 @@
         legend.appendChild(item);
       });
 
-      // info
+      // ----- PRICE DIRECTION (the main missing piece) -----
+      if (data.price_direction && showPriceDir) {
+        const pd = data.price_direction;
+        // make it clearly longer and distinct
+        createAxis(pd.direction, PRICE_COLOR, "ICICI Price Direction", 7.2, true);
+
+        const priceItem = document.createElement('div');
+        priceItem.className = 'legend-price';
+        priceItem.innerHTML = `▲ ICICI Price Direction<br><span style="font-weight:400;color:#94a3b8;font-size:10px">projection axis of the model</span>`;
+        legend.appendChild(priceItem);
+      }
+
+      // info panel
       const meta = data.meta;
       document.getElementById('info-panel').innerHTML = `
         <strong>Data-driven geometry</strong><br>
-        ${meta.n_factors} axes · ${meta.n_days} days<br>
+        ${meta.n_factors} factor axes · ${meta.n_days} days<br>
         ${meta.date_start} → ${meta.date_end}<br>
         Embedding stress: ${meta.embedding_stress_mse.toFixed(4)}<br>
-        Ridge α: ${meta.ridge_alpha.toFixed(4)}<br>
-        <span style="color:#64748b">Length ∝ |weight|</span>
+        Ridge α: ${meta.ridge_alpha.toFixed(4)}<br><br>
+        <span style="color:#f472b6">Pink arrow = ICICI price projection direction</span>
       `;
 
       document.getElementById('status').textContent = 'JSON loaded';
@@ -352,13 +382,17 @@
         useWeightLength ? 'Equal Length' : 'Weight Length';
     };
 
+    document.getElementById('btn-price').onclick = () => {
+      showPriceDir = !showPriceDir;
+      if (currentData) renderSpace(currentData);
+    };
+
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // start
     tryFetch();
 
     function animate() {
