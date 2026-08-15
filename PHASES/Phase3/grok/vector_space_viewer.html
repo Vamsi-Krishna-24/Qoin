@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICICI Factor Vector Space (Data-driven)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0b0f19;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+    #canvas-container { width: 100%; height: 100%; }
+    canvas { display: block; }
+
+    .top-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: rgba(11,15,25,0.92);
+      border-bottom: 1px solid #1e293b;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+    }
+    .top-bar h1 { font-size: 15px; font-weight: 600; color: #f8fafc; }
+    .status {
+      font-size: 12px;
+      color: #94a3b8;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #1e293b;
+    }
+    .status.ok { color: #4ade80; }
+    .status.err { color: #f87171; }
+
+    .info-panel {
+      position: absolute;
+      top: 60px; left: 16px;
+      background: rgba(15,23,42,0.92);
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      max-width: 260px;
+      z-index: 10;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #94a3b8;
+    }
+    .info-panel strong { color: #e2e8f0; }
+
+    .legend {
+      position: absolute;
+      top: 60px; right: 16px;
+      background: rgba(15,23,42,0.92);
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px 12px;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      font-size: 11px;
+      z-index: 10;
+      min-width: 190px;
+    }
+    .legend-title {
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 3px;
+      color: #cbd5e1;
+    }
+    .legend-color {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 16px; left: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+    .controls button {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .controls button:hover { background: #334155; }
+
+    .file-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
+      z-index: 30;
+    }
+    .file-fallback.active { display: flex; }
+    .file-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px 28px;
+      text-align: center;
+      max-width: 360px;
+    }
+    .file-box h2 { font-size: 16px; margin-bottom: 10px; color: #f8fafc; }
+    .file-box p { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+    .file-box input { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div class="top-bar">
+    <h1>ICICI Factor Vector Space</h1>
+    <div id="status" class="status">Loading JSON…</div>
+  </div>
+
+  <div class="info-panel" id="info-panel">
+    <strong>Data-driven geometry</strong><br>
+    Axes directions come from real correlations.<br>
+    Length ∝ |weight|.<br>
+    Drag to rotate • Scroll to zoom
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="controls">
+    <button id="btn-reset">Reset View</button>
+    <button id="btn-labels">Toggle Labels</button>
+    <button id="btn-equal">Equal Length</button>
+  </div>
+
+  <!-- Fallback if fetch fails (file:// protocol) -->
+  <div class="file-fallback" id="file-fallback">
+    <div class="file-box">
+      <h2>Load vector_space.json</h2>
+      <p>Browser blocked automatic loading.<br>Select the JSON file manually:</p>
+      <input type="file" id="json-input" accept=".json" />
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const COLORS = [
+      0xf87171, 0xfb923c, 0xfbbf24, 0xa3e635, 0x34d399,
+      0x22d3ee, 0x60a5fa, 0x818cf8, 0xa78bfa, 0xf472b6,
+      0xfb7185, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
+      0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0xf43f5e
+    ];
+
+    // -------------------- Three.js --------------------
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0f19);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(9, 7, 11);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+    dirLight.position.set(5, 12, 8);
+    scene.add(dirLight);
+
+    scene.add(new THREE.GridHelper(14, 14, 0x1e293b, 0x111827));
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xf8fafc })
+    ));
+
+    const axesGroup = new THREE.Group();
+    scene.add(axesGroup);
+    let labelSprites = [];
+    let showLabels = true;
+    let useWeightLength = true;
+    let currentData = null;
+
+    // -------------------- Drawing --------------------
+    function clearAxes() {
+      while (axesGroup.children.length) axesGroup.remove(axesGroup.children[0]);
+      labelSprites = [];
+    }
+
+    function createAxis(direction, color, name, length) {
+      const dir = new THREE.Vector3(...direction).normalize();
+      const end = dir.clone().multiplyScalar(length);
+
+      // line
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0,0,0), end
+      ]);
+      axesGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color })));
+
+      // cone
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.07, 0.22, 8),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      cone.position.copy(end);
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+      axesGroup.add(cone);
+
+      // label
+      const canvas = document.createElement('canvas');
+      canvas.width = 340; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0b0f19';
+      ctx.fillRect(0,0,340,64);
+      ctx.font = 'bold 25px Segoe UI, sans-serif';
+      ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(name, 170, 32);
+
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        transparent: true
+      }));
+      sprite.scale.set(1.7, 0.32, 1);
+      sprite.position.copy(end.clone().multiplyScalar(1.18));
+      axesGroup.add(sprite);
+      labelSprites.push(sprite);
+    }
+
+    function renderSpace(data) {
+      currentData = data;
+      clearAxes();
+
+      const axes = data.axes;
+      const maxAbs = Math.max(...axes.map(a => a.abs_weight), 1e-6);
+
+      // legend
+      const legend = document.getElementById('legend');
+      legend.innerHTML = `<div class="legend-title">Axes (${axes.length}) – sorted by |w|</div>`;
+
+      axes.forEach((ax, i) => {
+        const len = useWeightLength
+          ? 1.8 + 4.2 * (ax.abs_weight / maxAbs)   // min 1.8, max ~6
+          : 5.0;
+
+        const color = COLORS[i % COLORS.length];
+        createAxis(ax.direction, color, ax.name, len);
+
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+          <div class="legend-color" style="background:#${color.toString(16).padStart(6,'0')}"></div>
+          <span>${ax.name} <span style="color:#64748b">(${ax.weight.toFixed(3)})</span></span>`;
+        legend.appendChild(item);
+      });
+
+      // info
+      const meta = data.meta;
+      document.getElementById('info-panel').innerHTML = `
+        <strong>Data-driven geometry</strong><br>
+        ${meta.n_factors} axes · ${meta.n_days} days<br>
+        ${meta.date_start} → ${meta.date_end}<br>
+        Embedding stress: ${meta.embedding_stress_mse.toFixed(4)}<br>
+        Ridge α: ${meta.ridge_alpha.toFixed(4)}<br>
+        <span style="color:#64748b">Length ∝ |weight|</span>
+      `;
+
+      document.getElementById('status').textContent = 'JSON loaded';
+      document.getElementById('status').className = 'status ok';
+    }
+
+    // -------------------- Load JSON --------------------
+    async function tryFetch() {
+      try {
+        const res = await fetch('vector_space.json');
+        if (!res.ok) throw new Error('not found');
+        const data = await res.json();
+        renderSpace(data);
+      } catch (e) {
+        document.getElementById('status').textContent = 'Select JSON file';
+        document.getElementById('status').className = 'status err';
+        document.getElementById('file-fallback').classList.add('active');
+      }
+    }
+
+    document.getElementById('json-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          document.getElementById('file-fallback').classList.remove('active');
+          renderSpace(data);
+        } catch (err) {
+          alert('Invalid JSON');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // -------------------- UI --------------------
+    document.getElementById('btn-reset').onclick = () => {
+      camera.position.set(9, 7, 11);
+      controls.target.set(0,0,0);
+      controls.update();
+    };
+
+    document.getElementById('btn-labels').onclick = () => {
+      showLabels = !showLabels;
+      labelSprites.forEach(s => s.visible = showLabels);
+    };
+
+    document.getElementById('btn-equal').onclick = () => {
+      useWeightLength = !useWeightLength;
+      if (currentData) renderSpace(currentData);
+      document.getElementById('btn-equal').textContent =
+        useWeightLength ? 'Equal Length' : 'Weight Length';
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // start
+    tryFetch();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
