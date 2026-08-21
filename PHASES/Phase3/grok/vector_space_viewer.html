@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ICICI Factor Vector Space (Data-driven)</title>
+  <title>ICICI Factor Vector Space</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -17,150 +17,163 @@
     canvas { display: block; }
 
     .top-bar {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: rgba(11,15,25,0.92);
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(11,15,25,0.95);
       border-bottom: 1px solid #1e293b;
-      z-index: 20;
+      z-index: 20; gap: 8px;
       backdrop-filter: blur(10px);
     }
-    .top-bar h1 { font-size: 15px; font-weight: 600; color: #f8fafc; }
+    .top-bar h1 { font-size: 13px; font-weight: 600; color: #f8fafc; white-space: nowrap; }
+    .template-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .template-btns button {
+      background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+      padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;
+    }
+    .template-btns button:hover { background: #334155; color: #e2e8f0; }
+    .template-btns button.active {
+      background: #3b82f6; border-color: #3b82f6; color: white;
+    }
     .status {
-      font-size: 12px;
-      color: #94a3b8;
-      padding: 4px 10px;
-      border-radius: 6px;
-      background: #1e293b;
+      font-size: 11px; color: #94a3b8; padding: 3px 8px;
+      border-radius: 6px; background: #1e293b; white-space: nowrap;
     }
     .status.ok { color: #4ade80; }
     .status.err { color: #f87171; }
 
     .info-panel {
-      position: absolute;
-      top: 60px; left: 16px;
-      background: rgba(15,23,42,0.92);
-      border: 1px solid #1e293b;
-      border-radius: 10px;
-      padding: 12px 14px;
-      max-width: 270px;
-      z-index: 10;
-      font-size: 12px;
-      line-height: 1.45;
-      color: #94a3b8;
+      position: absolute; top: 46px; left: 12px;
+      background: rgba(15,23,42,0.95); border: 1px solid #1e293b;
+      border-radius: 10px; padding: 10px 12px; max-width: 320px;
+      z-index: 10; font-size: 11.5px; line-height: 1.45; color: #94a3b8;
+      max-height: calc(100vh - 160px); overflow-y: auto;
     }
     .info-panel strong { color: #e2e8f0; }
+    .eq { 
+      margin-top: 8px; padding: 8px; 
+      background: #0f172a; border-radius: 6px; 
+      font-family: ui-monospace, monospace; font-size: 10.5px; 
+      color: #cbd5e1; white-space: pre-wrap; line-height: 1.4;
+    }
 
     .legend {
-      position: absolute;
-      top: 60px; right: 16px;
-      background: rgba(15,23,42,0.92);
-      border: 1px solid #1e293b;
-      border-radius: 10px;
-      padding: 10px 12px;
-      max-height: calc(100vh - 90px);
-      overflow-y: auto;
-      font-size: 11px;
-      z-index: 10;
-      min-width: 200px;
+      position: absolute; top: 46px; right: 12px;
+      background: rgba(15,23,42,0.95); border: 1px solid #1e293b;
+      border-radius: 10px; padding: 9px 11px;
+      max-height: calc(100vh - 150px); overflow-y: auto;
+      font-size: 10.5px; z-index: 10; min-width: 180px;
     }
-    .legend-title {
-      font-weight: 600;
-      color: #f8fafc;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 3px;
-      color: #cbd5e1;
-    }
-    .legend-color {
-      width: 10px; height: 10px;
-      border-radius: 2px;
-      flex-shrink: 0;
-    }
-    .legend-price {
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid #334155;
-      color: #f472b6;
-      font-weight: 600;
-    }
+    .legend-title { font-weight: 600; color: #f8fafc; margin-bottom: 7px; font-size: 11px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: #cbd5e1; }
+    .legend-color { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 
     .controls {
-      position: absolute;
-      bottom: 16px; left: 16px;
-      display: flex;
-      gap: 8px;
-      z-index: 10;
+      position: absolute; bottom: 78px; left: 12px;
+      display: flex; gap: 7px; z-index: 25;
     }
     .controls button {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #e2e8f0;
-      padding: 6px 12px;
-      border-radius: 7px;
-      font-size: 12px;
-      cursor: pointer;
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      padding: 6px 11px; border-radius: 6px; font-size: 12px; cursor: pointer;
     }
     .controls button:hover { background: #334155; }
 
-    .file-fallback {
-      position: absolute;
-      inset: 0;
+    .scrubber-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(11,15,25,0.96); border-top: 1px solid #1e293b;
+      padding: 9px 16px 11px; z-index: 20;
       display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.7);
-      z-index: 30;
     }
-    .file-fallback.active { display: flex; }
-    .file-box {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 24px 28px;
-      text-align: center;
-      max-width: 360px;
+    .scrubber-bar.active { display: block; }
+    .scrubber-bar label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px; }
+    .scrubber-bar input[type=range] { width: 100%; accent-color: #3b82f6; }
+    .scrubber-date { font-size: 13px; color: #e2e8f0; font-weight: 500; margin-top: 3px; }
+
+    .compare-panel {
+      display: none;
+      position: absolute; top: 46px; left: 12px; right: 12px; bottom: 16px;
+      background: rgba(15,23,42,0.97); border: 1px solid #1e293b;
+      border-radius: 12px; padding: 16px 18px; z-index: 15;
+      overflow-y: auto;
     }
-    .file-box h2 { font-size: 16px; margin-bottom: 10px; color: #f8fafc; }
-    .file-box p { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+    .compare-panel.active { display: block; }
+    .compare-panel h2 { font-size: 15px; color: #f8fafc; margin-bottom: 4px; }
+    .compare-panel .sub { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+
+    .lag-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+    .lag-card .lag-title {
+      font-weight: 600; color: #f8fafc; margin-bottom: 4px; font-size: 13px;
+    }
+    .lag-card .lag-desc { font-size: 11px; color: #94a3b8; margin-bottom: 8px; }
+    .lag-stats {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      font-size: 12px; margin-bottom: 8px;
+    }
+    .lag-stats span { color: #cbd5e1; }
+    .lag-stats .r2 { color: #4ade80; font-weight: 600; }
+    .weight-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+    }
+    .weight-grid .n { color: #94a3b8; }
+    .weight-grid .v.pos { color: #4ade80; }
+    .weight-grid .v.neg { color: #f87171; }
+
+    .loading-overlay {
+      position: absolute; inset: 0;
+      background: rgba(11,15,25,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50; font-size: 14px; color: #94a3b8;
+    }
+    .loading-overlay.hidden { display: none; }
   </style>
 </head>
 <body>
   <div id="canvas-container"></div>
+  <div class="loading-overlay" id="loading">Loading vector_space.json…</div>
 
   <div class="top-bar">
     <h1>ICICI Factor Vector Space</h1>
-    <div id="status" class="status">Loading JSON…</div>
+    <div class="template-btns">
+      <button id="btn-t1">T1 – Axes</button>
+      <button id="btn-t2" class="active">T2 – + Price Dir</button>
+      <button id="btn-t3">T3 – Scrubber</button>
+      <button id="btn-t4">T4 – Lagged Space</button>
+      <button id="btn-t5">T5 – Multi-Lag</button>
+    </div>
+    <div id="status" class="status">Loading…</div>
   </div>
 
-  <div class="info-panel" id="info-panel">
-    <strong>Data-driven geometry</strong><br>
-    Loading…
-  </div>
-
+  <div class="info-panel" id="info-panel">Loading…</div>
   <div class="legend" id="legend"></div>
 
-  <div class="controls">
+  <div class="controls" id="controls">
     <button id="btn-reset">Reset View</button>
     <button id="btn-labels">Toggle Labels</button>
     <button id="btn-equal">Equal Length</button>
-    <button id="btn-price">Toggle Price Dir</button>
   </div>
 
-  <div class="file-fallback" id="file-fallback">
-    <div class="file-box">
-      <h2>Load vector_space.json</h2>
-      <p>Browser blocked automatic loading.<br>Select the JSON file manually:</p>
-      <input type="file" id="json-input" accept=".json" />
+  <div class="scrubber-bar" id="scrubber-bar">
+    <label>Date scrubber</label>
+    <input type="range" id="date-slider" min="0" max="100" value="100" />
+    <div class="scrubber-date" id="scrubber-date">—</div>
+  </div>
+
+  <div class="compare-panel" id="compare-panel">
+    <h2>Template 5 – Multi-Lag Analysis</h2>
+    <div class="sub">
+      factors(t) → price(t + lag) &nbsp;|&nbsp; Negative lag = past price, Positive lag = future price
     </div>
+    <div id="lag-content"></div>
   </div>
 
   <script type="importmap">
@@ -182,16 +195,16 @@
       0xfb7185, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
       0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0xf43f5e
     ];
+    const PRICE_COLOR = 0xf472b6;
+    const POINT_COLOR = 0x38bdf8;
+    const TRAIL_COLOR = 0x64748b;
 
-    const PRICE_COLOR = 0xf472b6;   // pink for price direction
-
-    // -------------------- Three.js --------------------
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0f19);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(9, 7, 11);
+    camera.position.set(10, 8, 12);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -200,191 +213,299 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
-    dirLight.position.set(5, 12, 8);
-    scene.add(dirLight);
-
-    scene.add(new THREE.GridHelper(14, 14, 0x1e293b, 0x111827));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.7);
+    dl.position.set(5, 12, 8);
+    scene.add(dl);
+    scene.add(new THREE.GridHelper(16, 16, 0x1e293b, 0x111827));
     scene.add(new THREE.Mesh(
-      new THREE.SphereGeometry(0.06, 16, 16),
+      new THREE.SphereGeometry(0.05, 12, 12),
       new THREE.MeshBasicMaterial({ color: 0xf8fafc })
     ));
 
-    const axesGroup = new THREE.Group();
-    scene.add(axesGroup);
+    const root = new THREE.Group();
+    scene.add(root);
+
     let labelSprites = [];
     let showLabels = true;
     let useWeightLength = true;
-    let showPriceDir = true;
     let currentData = null;
-    let priceObjects = [];
+    let currentTemplate = 2;
+    let dayPoint = null;
+    let trailLine = null;
 
-    // -------------------- Drawing helpers --------------------
-    function clearAxes() {
-      while (axesGroup.children.length) axesGroup.remove(axesGroup.children[0]);
+    function clearDynamic() {
+      if (dayPoint) { root.remove(dayPoint); dayPoint = null; }
+      if (trailLine) { root.remove(trailLine); trailLine = null; }
+    }
+    function clearAll() {
+      while (root.children.length) root.remove(root.children[0]);
       labelSprites = [];
-      priceObjects = [];
+      dayPoint = null;
+      trailLine = null;
     }
 
-    function createAxis(direction, color, name, length, isPrice = false) {
-      const dir = new THREE.Vector3(...direction).normalize();
+    function makeLabel(text, color, scale=1.55) {
+      const c = document.createElement('canvas');
+      c.width = 360; c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#0b0f19';
+      ctx.fillRect(0,0,360,64);
+      ctx.font = 'bold 24px Segoe UI, sans-serif';
+      ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 180, 32);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+      s.scale.set(scale, 0.32, 1);
+      return s;
+    }
+
+    function addAxis(dirArr, color, name, length, thick=false) {
+      const dir = new THREE.Vector3(...dirArr).normalize();
       const end = dir.clone().multiplyScalar(length);
-
-      const lineMat = new THREE.LineBasicMaterial({
-        color,
-        linewidth: isPrice ? 3 : 1
-      });
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0,0,0), end
-      ]);
-      const line = new THREE.Line(geo, lineMat);
-      axesGroup.add(line);
-
-      const coneRadius = isPrice ? 0.12 : 0.07;
-      const coneHeight = isPrice ? 0.35 : 0.22;
+      root.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), end]),
+        new THREE.LineBasicMaterial({ color })
+      ));
       const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(coneRadius, coneHeight, 10),
+        new THREE.ConeGeometry(thick ? 0.11 : 0.06, thick ? 0.3 : 0.18, 8),
         new THREE.MeshBasicMaterial({ color })
       );
       cone.position.copy(end);
       cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
-      axesGroup.add(cone);
-
-      // label
-      const canvas = document.createElement('canvas');
-      canvas.width = 380; canvas.height = 64;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0b0f19';
-      ctx.fillRect(0,0,380,64);
-      ctx.font = isPrice ? 'bold 28px Segoe UI, sans-serif' : 'bold 24px Segoe UI, sans-serif';
-      ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(name, 190, 32);
-
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: new THREE.CanvasTexture(canvas),
-        transparent: true
-      }));
-      sprite.scale.set(isPrice ? 2.1 : 1.7, 0.36, 1);
-      sprite.position.copy(end.clone().multiplyScalar(1.20));
-      axesGroup.add(sprite);
-      labelSprites.push(sprite);
-
-      if (isPrice) {
-        priceObjects.push(line, cone, sprite);
-      }
+      root.add(cone);
+      const lab = makeLabel(name, color, thick ? 1.9 : 1.5);
+      lab.position.copy(end.clone().multiplyScalar(1.17));
+      root.add(lab);
+      labelSprites.push(lab);
     }
 
-    function renderSpace(data) {
-      currentData = data;
-      clearAxes();
+    function buildEquation(weightsObj, title) {
+      if (!weightsObj) return title + "\n(no weights)";
+      const sorted = Object.entries(weightsObj).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
+      let lines = [title, ""];
+      sorted.slice(0, 12).forEach(([name, w]) => {
+        const sign = w >= 0 ? "+" : "−";
+        lines.push(`  ${sign} ${Math.abs(w).toFixed(4)} · ${name}`);
+      });
+      if (sorted.length > 12) lines.push("  …");
+      lines.push("  + Residual");
+      return lines.join("\n");
+    }
 
-      const axes = data.axes;
-      const maxAbs = Math.max(...axes.map(a => a.abs_weight), 1e-6);
+    function drawSpace(useLagged = false) {
+      const axes = currentData.axes;
+      const weights = useLagged ? currentData.weights_lagged : currentData.weights_contemporaneous;
+      const maxAbs = Math.max(...Object.values(weights || {}).map(Math.abs), 1e-6);
 
-      // legend
       const legend = document.getElementById('legend');
-      legend.innerHTML = `<div class="legend-title">Factor Axes (${axes.length})</div>`;
+      legend.innerHTML = `<div class="legend-title">Factor Axes ${useLagged ? "(Lagged)" : "(Same-day)"}</div>`;
 
       axes.forEach((ax, i) => {
-        const len = useWeightLength
-          ? 1.6 + 4.0 * (ax.abs_weight / maxAbs)
-          : 4.8;
-
-        const color = COLORS[i % COLORS.length];
-        createAxis(ax.direction, color, ax.name, len, false);
-
+        const w = (weights && weights[ax.name]) ? weights[ax.name] : ax.weight;
+        const len = useWeightLength ? 1.4 + 3.6 * (Math.abs(w) / maxAbs) : 4.3;
+        const col = COLORS[i % COLORS.length];
+        addAxis(ax.direction, col, ax.name, len, false);
         const item = document.createElement('div');
         item.className = 'legend-item';
-        item.innerHTML = `
-          <div class="legend-color" style="background:#${color.toString(16).padStart(6,'0')}"></div>
-          <span>${ax.name} <span style="color:#64748b">(${ax.weight.toFixed(3)})</span></span>`;
+        item.innerHTML = `<div class="legend-color" style="background:#${col.toString(16).padStart(6,'0')}"></div>
+          <span>${ax.name} <span style="color:#64748b">(${w >= 0 ? "+" : ""}${Number(w).toFixed(3)})</span></span>`;
         legend.appendChild(item);
       });
 
-      // ----- PRICE DIRECTION (the main missing piece) -----
-      if (data.price_direction && showPriceDir) {
-        const pd = data.price_direction;
-        // make it clearly longer and distinct
-        createAxis(pd.direction, PRICE_COLOR, "ICICI Price Direction", 7.2, true);
+      if (currentData.price_direction) {
+        const label = useLagged ? "ICICI Price Dir (Lagged)" : "ICICI Price Dir (Same-day)";
+        addAxis(currentData.price_direction.direction, PRICE_COLOR, label, 6.5, true);
+      }
+    }
 
-        const priceItem = document.createElement('div');
-        priceItem.className = 'legend-price';
-        priceItem.innerHTML = `▲ ICICI Price Direction<br><span style="font-weight:400;color:#94a3b8;font-size:10px">projection axis of the model</span>`;
-        legend.appendChild(priceItem);
+    function updateDay(idx) {
+      if (!currentData || !currentData.daily) return;
+      clearDynamic();
+      const day = currentData.daily[idx];
+      const trailLen = 40;
+      const start = Math.max(0, idx - trailLen);
+      const pts = [];
+      for (let i = start; i <= idx; i++) {
+        const d = currentData.daily[i];
+        pts.push(new THREE.Vector3(d.x, d.y, d.z));
+      }
+      if (pts.length > 1) {
+        trailLine = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(pts),
+          new THREE.LineBasicMaterial({ color: TRAIL_COLOR, transparent: true, opacity: 0.55 })
+        );
+        root.add(trailLine);
+      }
+      dayPoint = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 14, 14),
+        new THREE.MeshBasicMaterial({ color: POINT_COLOR })
+      );
+      dayPoint.position.set(day.x, day.y, day.z);
+      root.add(dayPoint);
+
+      document.getElementById('scrubber-date').textContent =
+        `${day.date}   |   Residual: ₹${day.residual_rupee.toFixed(2)}`;
+
+      const eq = buildEquation(currentData.weights_contemporaneous, "Same-day equation:");
+      document.getElementById('info-panel').innerHTML = `
+        <strong>Template 3 – Time Scrubber (Same-day)</strong><br><br>
+        Date: <span style="color:#e2e8f0">${day.date}</span><br>
+        Residual: <span style="color:${day.residual_rupee >= 0 ? '#4ade80' : '#f87171'}">₹${day.residual_rupee.toFixed(2)}</span>
+        <div class="eq">${eq}</div>
+      `;
+    }
+
+    function showMultiLag() {
+      document.getElementById('compare-panel').classList.add('active');
+      document.getElementById('info-panel').style.display = 'none';
+      document.getElementById('legend').style.display = 'none';
+      document.getElementById('controls').style.display = 'none';
+      document.getElementById('scrubber-bar').classList.remove('active');
+
+      const ml = currentData.multi_lag || {};
+      const order = ["-2", "-1", "0", "1", "2", "3"];
+      let html = "";
+
+      order.forEach(k => {
+        const L = ml[k];
+        if (!L) return;
+        const sorted = Object.entries(L.weights || {}).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
+        let whtml = "";
+        sorted.slice(0, 10).forEach(([n, v]) => {
+          const cls = v >= 0 ? "pos" : "neg";
+          whtml += `<span class="n">${n}</span><span class="v ${cls}">${v >= 0 ? "+" : ""}${v.toFixed(4)}</span>`;
+        });
+
+        html += `
+          <div class="lag-card">
+            <div class="lag-title">Lag ${L.lag > 0 ? "+"+L.lag : L.lag}</div>
+            <div class="lag-desc">${L.description}</div>
+            <div class="lag-stats">
+              <span>R² = <span class="r2">${(L.r2*100).toFixed(2)}%</span></span>
+              <span>α = ${Number(L.alpha).toFixed(4)}</span>
+              <span>Resid σ = ${Number(L.residual_std).toFixed(4)}</span>
+              <span>n = ${L.n_samples}</span>
+            </div>
+            <div class="weight-grid">${whtml}</div>
+          </div>
+        `;
+      });
+
+      document.getElementById('lag-content').innerHTML = html || "<p>No multi-lag data found. Re-run build_vector_space.py</p>";
+    }
+
+    function hideMultiLag() {
+      document.getElementById('compare-panel').classList.remove('active');
+      document.getElementById('info-panel').style.display = 'block';
+      document.getElementById('legend').style.display = 'block';
+      document.getElementById('controls').style.display = 'flex';
+    }
+
+    function render() {
+      if (!currentData) return;
+
+      if (currentTemplate === 5) {
+        clearAll();
+        showMultiLag();
+        document.querySelectorAll('.template-btns button').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-t5').classList.add('active');
+        return;
       }
 
-      // info panel
-      const meta = data.meta;
-      document.getElementById('info-panel').innerHTML = `
-        <strong>Data-driven geometry</strong><br>
-        ${meta.n_factors} factor axes · ${meta.n_days} days<br>
-        ${meta.date_start} → ${meta.date_end}<br>
-        Embedding stress: ${meta.embedding_stress_mse.toFixed(4)}<br>
-        Ridge α: ${meta.ridge_alpha.toFixed(4)}<br><br>
-        <span style="color:#f472b6">Pink arrow = ICICI price projection direction</span>
-      `;
+      hideMultiLag();
+      clearAll();
 
+      const isLagged = currentTemplate === 4;
+      drawSpace(isLagged);
+
+      const scrubber = document.getElementById('scrubber-bar');
+      const slider = document.getElementById('date-slider');
+
+      if (currentTemplate === 3 && currentData.daily) {
+        scrubber.classList.add('active');
+        slider.max = currentData.daily.length - 1;
+        slider.value = currentData.daily.length - 1;
+        updateDay(currentData.daily.length - 1);
+      } else {
+        scrubber.classList.remove('active');
+        const m = currentData.meta;
+        const alpha = isLagged ? (m.lagged_alpha ?? m.contemporaneous_alpha) : (m.contemporaneous_alpha ?? 0);
+        const title = isLagged
+          ? "Template 4 – Lagged Vector Space<br><span style='color:#94a3b8;font-weight:400'>Today’s factors → Tomorrow’s price</span>"
+          : currentTemplate === 1
+            ? "Template 1 – Factor axes only"
+            : "Template 2 – Axes + ICICI price direction";
+
+        const eq = buildEquation(
+          isLagged ? currentData.weights_lagged : currentData.weights_contemporaneous,
+          isLagged ? "Lagged equation:" : "Same-day equation:"
+        );
+
+        document.getElementById('info-panel').innerHTML = `
+          <strong>${title}</strong><br><br>
+          ${m.n_factors} axes · ${m.n_days} days<br>
+          ${m.date_start} → ${m.date_end}<br>
+          α: ${Number(alpha).toFixed(4)}
+          <div class="eq">${eq}</div>
+        `;
+      }
+
+      document.querySelectorAll('.template-btns button').forEach(b => b.classList.remove('active'));
+      document.getElementById(`btn-t${currentTemplate}`).classList.add('active');
+    }
+
+    function setData(data) {
+      currentData = data;
+      document.getElementById('loading').classList.add('hidden');
       document.getElementById('status').textContent = 'JSON loaded';
       document.getElementById('status').className = 'status ok';
+      render();
     }
 
-    // -------------------- Load JSON --------------------
-    async function tryFetch() {
+    async function loadJSON() {
       try {
-        const res = await fetch('vector_space.json');
-        if (!res.ok) throw new Error('not found');
-        const data = await res.json();
-        renderSpace(data);
-      } catch (e) {
-        document.getElementById('status').textContent = 'Select JSON file';
+        const r = await fetch('vector_space.json');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        setData(data);
+      } catch (err) {
+        document.getElementById('loading').innerHTML = `
+          Could not auto-load <b>vector_space.json</b><br><br>
+          Make sure the file is in the same folder and you opened the page via:<br>
+          <code>python -m http.server 8000</code><br><br>
+          <span style="color:#f87171">${err.message}</span>
+        `;
+        document.getElementById('status').textContent = 'Load failed';
         document.getElementById('status').className = 'status err';
-        document.getElementById('file-fallback').classList.add('active');
       }
     }
 
-    document.getElementById('json-input').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = JSON.parse(ev.target.result);
-          document.getElementById('file-fallback').classList.remove('active');
-          renderSpace(data);
-        } catch (err) {
-          alert('Invalid JSON');
-        }
-      };
-      reader.readAsText(file);
-    });
+    document.getElementById('btn-t1').onclick = () => { currentTemplate = 1; render(); };
+    document.getElementById('btn-t2').onclick = () => { currentTemplate = 2; render(); };
+    document.getElementById('btn-t3').onclick = () => { currentTemplate = 3; render(); };
+    document.getElementById('btn-t4').onclick = () => { currentTemplate = 4; render(); };
+    document.getElementById('btn-t5').onclick = () => { currentTemplate = 5; render(); };
 
-    // -------------------- UI --------------------
+    document.getElementById('date-slider').oninput = (e) => {
+      updateDay(parseInt(e.target.value, 10));
+    };
+
     document.getElementById('btn-reset').onclick = () => {
-      camera.position.set(9, 7, 11);
+      camera.position.set(10, 8, 12);
       controls.target.set(0,0,0);
       controls.update();
     };
-
     document.getElementById('btn-labels').onclick = () => {
       showLabels = !showLabels;
       labelSprites.forEach(s => s.visible = showLabels);
     };
-
     document.getElementById('btn-equal').onclick = () => {
       useWeightLength = !useWeightLength;
-      if (currentData) renderSpace(currentData);
-      document.getElementById('btn-equal').textContent =
-        useWeightLength ? 'Equal Length' : 'Weight Length';
-    };
-
-    document.getElementById('btn-price').onclick = () => {
-      showPriceDir = !showPriceDir;
-      if (currentData) renderSpace(currentData);
+      render();
+      document.getElementById('btn-equal').textContent = useWeightLength ? 'Equal Length' : 'Weight Length';
     };
 
     window.addEventListener('resize', () => {
@@ -393,14 +514,13 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    tryFetch();
+    loadJSON();
 
-    function animate() {
+    (function animate() {
       requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
-    }
-    animate();
+    })();
   </script>
 </body>
 </html>

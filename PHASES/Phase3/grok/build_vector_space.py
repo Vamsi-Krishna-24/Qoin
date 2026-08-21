@@ -1,6 +1,6 @@
 """
-Build a geometrically faithful 3D representation of the 21-factor vector space.
-Now also exports the price projection direction.
+Vector Space engine with multi-lag analysis for Template 5.
+Lags: -2, -1, 0, +1, +2, +3
 """
 
 import json
@@ -10,11 +10,9 @@ from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.metrics import r2_score
 from scipy.optimize import minimize
 
-# ============================================================
-# 1. Load & clean
-# ============================================================
 DATA_PATH = "/Users/surisettivamsikrishna/Downloads/Vamsi Pc/CODES/Qoin/Model data/master_raw_aligned.csv"
 
 df = pd.read_csv(DATA_PATH, parse_dates=["Date"])
@@ -23,31 +21,22 @@ df = df.sort_values("Date").dropna().reset_index(drop=True)
 target_col = "ICICI_Close"
 feature_cols = [c for c in df.columns if c not in ["Date", target_col]]
 n_factors = len(feature_cols)
+n_days = len(df)
 
-print(f"Loaded {len(df)} rows | {n_factors} factors")
+print(f"Loaded {n_days} rows | {n_factors} factors")
 print("Date range:", df["Date"].min().date(), "→", df["Date"].max().date())
 
 # ============================================================
-# 2. Normalize
+# Contemporaneous geometry (for Templates 1-4)
 # ============================================================
 scaler_X = StandardScaler()
 scaler_y = StandardScaler()
-
 X = scaler_X.fit_transform(df[feature_cols].values)
 y = scaler_y.fit_transform(df[[target_col]].values).ravel()
 
-# ============================================================
-# 3. Correlation → target angles
-# ============================================================
 corr = np.corrcoef(X, rowvar=False)
 corr = np.clip(corr, -0.999999, 0.999999)
-target_cos = corr.copy()
 
-print("Correlation matrix computed.")
-
-# ============================================================
-# 4. Embed 21 directions into 3D
-# ============================================================
 def spherical_embedding_loss(flat_vecs, target_cos):
     n = target_cos.shape[0]
     vecs = flat_vecs.reshape(n, 3)
@@ -61,47 +50,47 @@ def embed_directions(target_cos, seed=42):
     rng = np.random.RandomState(seed)
     init = rng.normal(size=(n, 3))
     init /= np.linalg.norm(init, axis=1, keepdims=True)
-
-    res = minimize(
-        spherical_embedding_loss,
-        init.ravel(),
-        args=(target_cos,),
-        method="L-BFGS-B",
-        options={"maxiter": 2000, "ftol": 1e-12}
-    )
+    res = minimize(spherical_embedding_loss, init.ravel(), args=(target_cos,),
+                   method="L-BFGS-B", options={"maxiter": 2000, "ftol": 1e-12})
     vecs = res.x.reshape(n, 3)
     vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
-    final_loss = spherical_embedding_loss(vecs.ravel(), target_cos)
-    print(f"3D angle-embedding stress (MSE on cosines): {final_loss:.6f}")
     return vecs
 
-print("Embedding 21 axes into 3D (preserving angles)...")
-directions_3d = embed_directions(target_cos)
+print("Embedding axes...")
+directions_3d = embed_directions(corr)
+stress = float(spherical_embedding_loss(directions_3d.ravel(), corr))
+print(f"3D embedding stress: {stress:.6f}")
 
-# ============================================================
-# 5. Weight vector w (Ridge)
-# ============================================================
-tscv = TimeSeriesSplit(n_splits=5)
-model = RidgeCV(alphas=np.logspace(-3, 3, 40), cv=tscv)
+model = RidgeCV(alphas=np.logspace(-3, 3, 40), cv=TimeSeriesSplit(n_splits=5))
 model.fit(X, y)
 weights = model.coef_.copy()
-alpha_chosen = float(model.alpha_)
+print(f"Contemporaneous alpha: {model.alpha_:.4f}")
 
-print(f"Ridge alpha: {alpha_chosen:.4f}")
+price_dir = directions_3d.T @ weights
+price_dir_unit = price_dir / (np.linalg.norm(price_dir) + 1e-12)
 
-# ============================================================
-# 6. Price projection direction in the same 3D embedding
-#    d_price = sum( w_i * d_i )
-# ============================================================
-price_dir_3d = directions_3d.T @ weights
-price_dir_norm = np.linalg.norm(price_dir_3d)
-price_dir_unit = price_dir_3d / (price_dir_norm + 1e-12)
+daily_pos = (directions_3d.T @ X.T).T
+y_proj = X @ weights
+residual = y - y_proj
 
-print(f"Price direction magnitude (pre-normalise): {price_dir_norm:.4f}")
+step = 2
+idx = np.arange(0, n_days, step)
+if idx[-1] != n_days - 1:
+    idx = np.append(idx, n_days - 1)
 
-# ============================================================
-# 7. Export single JSON
-# ============================================================
+daily = []
+for i in idx:
+    daily.append({
+        "date": str(df["Date"].iloc[i].date()),
+        "x": float(daily_pos[i, 0]),
+        "y": float(daily_pos[i, 1]),
+        "z": float(daily_pos[i, 2]),
+        "residual_rupee": float(
+            scaler_y.inverse_transform([[y[i]]])[0][0] -
+            scaler_y.inverse_transform([[y_proj[i]]])[0][0]
+        )
+    })
+
 axes = []
 for i, name in enumerate(feature_cols):
     axes.append({
@@ -111,29 +100,76 @@ for i, name in enumerate(feature_cols):
         "weight": float(weights[i]),
         "abs_weight": float(abs(weights[i]))
     })
-
 axes_sorted = sorted(axes, key=lambda a: a["abs_weight"], reverse=True)
 
+# ============================================================
+# Multi-lag analysis for Template 5
+# lag > 0  : factors(t) → price(t+lag)     (forward)
+# lag = 0  : factors(t) → price(t)         (contemporaneous)
+# lag < 0  : factors(t) → price(t+lag)     (backward)
+# ============================================================
+print("\nBuilding multi-lag models...")
+LAGS = [-2, -1, 0, 1, 2, 3]
+lag_results = {}
+
+for lag in LAGS:
+    df_l = df.copy()
+    if lag >= 0:
+        df_l["target"] = df_l[target_col].shift(-lag)   # future price
+    else:
+        df_l["target"] = df_l[target_col].shift(-lag)   # past price (shift positive)
+
+    df_l = df_l.dropna().reset_index(drop=True)
+
+    X_l = StandardScaler().fit_transform(df_l[feature_cols].values)
+    y_l = StandardScaler().fit_transform(df_l[["target"]].values).ravel()
+
+    m = RidgeCV(alphas=np.logspace(-3, 3, 30), cv=TimeSeriesSplit(n_splits=5))
+    m.fit(X_l, y_l)
+
+    y_hat = m.predict(X_l)
+    r2 = float(r2_score(y_l, y_hat))
+    resid = y_l - y_hat
+
+    lag_results[str(lag)] = {
+        "lag": lag,
+        "description": (
+            f"factors(t) → price(t{lag:+d})" if lag != 0
+            else "factors(t) → price(t)  [contemporaneous]"
+        ),
+        "alpha": float(m.alpha_),
+        "r2": r2,
+        "residual_mean": float(np.mean(resid)),
+        "residual_std": float(np.std(resid)),
+        "n_samples": int(len(df_l)),
+        "weights": {name: float(w) for name, w in zip(feature_cols, m.coef_)}
+    }
+    print(f"  lag {lag:+d}  R² = {r2:.4f}  α = {m.alpha_:.4f}  n = {len(df_l)}")
+
+# ============================================================
+# Export
+# ============================================================
 output = {
     "meta": {
         "n_factors": n_factors,
-        "n_days": int(len(df)),
+        "n_days": n_days,
         "date_start": str(df["Date"].min().date()),
         "date_end": str(df["Date"].max().date()),
-        "ridge_alpha": alpha_chosen,
-        "embedding_stress_mse": float(spherical_embedding_loss(directions_3d.ravel(), target_cos)),
-        "note": "Directions preserve real pairwise correlations. Price direction is the weighted sum of factor directions."
+        "contemporaneous_alpha": float(model.alpha_),
+        "lagged_alpha": lag_results["1"]["alpha"],
+        "embedding_stress_mse": stress,
+        "scrubber_points": len(daily)
     },
     "axes": axes_sorted,
     "price_direction": {
         "name": "ICICI_Close (projection direction)",
-        "direction": price_dir_unit.tolist(),
-        "magnitude_before_normalise": float(price_dir_norm),
-        "description": "Direction of the linear combination sum(w_i * factor_i) inside the 3D embedding"
+        "direction": price_dir_unit.tolist()
     },
-    "correlation_matrix": corr.tolist(),
+    "daily": daily,
     "feature_order": feature_cols,
-    "weights_original_order": weights.tolist()
+    "weights_contemporaneous": {name: float(w) for name, w in zip(feature_cols, weights)},
+    "weights_lagged": lag_results["1"]["weights"],
+    "multi_lag": lag_results
 }
 
 out_path = Path("vector_space.json")
@@ -141,5 +177,5 @@ with open(out_path, "w") as f:
     json.dump(output, f, indent=2)
 
 print(f"\nExported → {out_path.resolve()}")
-print("JSON now also contains the price projection direction.")
+print("Template 5 multi-lag data included.")
 print("Done.")
